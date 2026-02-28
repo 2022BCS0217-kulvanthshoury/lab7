@@ -20,7 +20,13 @@ pipeline {
             steps {
                 echo "Starting container..."
                 bat """
-                docker rm -f %CONTAINER_NAME% || exit 0
+                REM --- Remove container only if it exists ---
+                docker ps -a --format "{{.Names}}" | findstr /I "%CONTAINER_NAME%" >nul
+                if %errorlevel%==0 (
+                    docker rm -f %CONTAINER_NAME%
+                )
+
+                REM --- Run fresh container ---
                 docker run -d -p %PORT%:8000 --name %CONTAINER_NAME% %IMAGE_NAME%
                 """
             }
@@ -32,14 +38,19 @@ pipeline {
                 bat """
                 powershell -Command ^
                 "$max=30; ^
+                $ready=$false; ^
                 for($i=0;$i -lt $max;$i++){ ^
                   try{ ^
                     $r=Invoke-WebRequest -Uri http://localhost:%PORT%/health -UseBasicParsing; ^
-                    if($r.StatusCode -eq 200){ exit 0 } ^
+                    if($r.StatusCode -eq 200){ ^
+                        Write-Host 'API is ready'; ^
+                        $ready=$true; ^
+                        break; ^
+                    } ^
                   } catch{} ^
                   Start-Sleep -Seconds 2 ^
                 }; ^
-                exit 1"
+                if(-not $ready){ exit 1 }"
                 """
             }
         }
@@ -52,8 +63,12 @@ pipeline {
                   -H "Content-Type: application/json" ^
                   -d @valid_input.json > valid_response.txt
 
+                echo ===== VALID RESPONSE =====
                 type valid_response.txt
-                findstr prediction valid_response.txt
+
+                REM --- Validate prediction exists ---
+                findstr /I "prediction" valid_response.txt >nul
+                if %errorlevel% neq 0 exit /b 1
                 """
             }
         }
@@ -67,6 +82,7 @@ pipeline {
                   -H "Content-Type: application/json" ^
                   -d @invalid_input.json > status.txt
 
+                echo ===== INVALID RESPONSE =====
                 type invalid_response.txt
                 type status.txt
                 """
@@ -76,7 +92,12 @@ pipeline {
         stage('Stop Container') {
             steps {
                 echo "Stopping container..."
-                bat "docker rm -f %CONTAINER_NAME% || exit 0"
+                bat """
+                docker ps -a --format "{{.Names}}" | findstr /I "%CONTAINER_NAME%" >nul
+                if %errorlevel%==0 (
+                    docker rm -f %CONTAINER_NAME%
+                )
+                """
             }
         }
     }
@@ -87,6 +108,9 @@ pipeline {
         }
         failure {
             echo "Pipeline Failed"
+        }
+        always {
+            echo "Pipeline execution completed."
         }
     }
 }

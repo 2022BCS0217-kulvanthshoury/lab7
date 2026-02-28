@@ -35,23 +35,21 @@ pipeline {
         stage('Wait for Service Readiness') {
             steps {
                 echo "Waiting for API..."
-                bat """
-                powershell -Command ^
-                "$max=30; ^
-                $ready=$false; ^
-                for($i=0;$i -lt $max;$i++){ ^
-                  try{ ^
-                    $r=Invoke-WebRequest -Uri http://localhost:%PORT%/health -UseBasicParsing; ^
-                    if($r.StatusCode -eq 200){ ^
-                        Write-Host 'API is ready'; ^
-                        $ready=$true; ^
-                        break; ^
-                    } ^
-                  } catch{} ^
-                  Start-Sleep -Seconds 2 ^
-                }; ^
-                if(-not $ready){ exit 1 }"
-                """
+                bat '''
+                powershell -Command "
+                for($i=0;$i -lt 30;$i++){
+                  try{
+                    $r=Invoke-WebRequest -Uri http://localhost:%PORT%/health -UseBasicParsing
+                    if($r.StatusCode -eq 200){
+                        Write-Host 'API is ready'
+                        exit 0
+                    }
+                  } catch{}
+                  Start-Sleep -Seconds 2
+                }
+                exit 1
+                "
+                '''
             }
         }
 

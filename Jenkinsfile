@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "<YOUR_DOCKER_USERNAME>/ml-inference:latest"
+        IMAGE_NAME = "2022bcs0217shoury/ml-inference:latest"
         CONTAINER_NAME = "ml-inference-test"
         PORT = "8000"
     }

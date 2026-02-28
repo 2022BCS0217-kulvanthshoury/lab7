@@ -35,21 +35,25 @@ pipeline {
         stage('Wait for Service Readiness') {
             steps {
                 echo "Waiting for API..."
-                bat '''
-                powershell -Command "
-                for($i=0;$i -lt 30;$i++){
-                  try{
-                    $r=Invoke-WebRequest -Uri http://localhost:%PORT%/health -UseBasicParsing
-                    if($r.StatusCode -eq 200){
-                        Write-Host 'API is ready'
-                        exit 0
-                    }
-                  } catch{}
-                  Start-Sleep -Seconds 2
-                }
-                exit 1
-                "
-                '''
+                bat """
+                set /a count=0
+
+                :retry
+                curl -s http://localhost:%PORT%/health >nul 2>nul
+                if %errorlevel%==0 (
+                    echo API is ready
+                    exit /b 0
+                )
+
+                set /a count+=1
+                if %count% GEQ 30 (
+                    echo API failed to start
+                    exit /b 1
+                )
+
+                timeout /t 2 >nul
+                goto retry
+                """
             }
         }
 
